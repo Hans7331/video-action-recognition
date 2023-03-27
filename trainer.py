@@ -266,21 +266,16 @@ for epoch in tqdm(range(1,epochs+1)):
         #cm_to_tb = add_cm_to_tb("Test Diagonal matrix.png")
         #tb_writer.add_image("Confusion Matrix",cm_to_tb,epoch)    
     if val_accuracy > best_accuracy: 
-        torch.save(model, 'model_save/vivit-best-model.pt')
-        torch.save(model.state_dict(), 'model_save/vivit-best-model-parameters.pt')
+        torch.save(model, '../model_save/vivit-best-model.pt')
+        torch.save(model.state_dict(), '../model_save/vivit-best-model-parameters.pt')
 
 print(np.diag(np.array(confusion_matrix)))
 print(np.diag(np.array(confusion_matrix_test)))
         
-torch.save(model,"model_save/vivit-last-model.pt")
-torch.save(model.state_dict(), 'model_save/vivit-last-model-parameters.pt')
+torch.save(model,"../model_save/vivit-last-model.pt")
+torch.save(model.state_dict(), '../model_save/vivit-last-model-parameters.pt')
 
 # ############################ Driver functions for driving the loop
-
-
-
-
-# change
 
 
 
