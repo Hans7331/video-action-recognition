@@ -30,7 +30,6 @@ import opt
 from Dataset import ActivityNet
 from vivit_model1 import ViViT_1, ViViT_2
 from model import ViViT
-from vivit_model_3 import ViViTBackbone
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
 
@@ -221,9 +220,6 @@ test_loader = DataLoader(test_data, batch_size=test_batch_size)
 # initialize model and plot on tensorboard
 if opt.pr == 1:
     model = ViViT_2(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
-    
-elif opt.pr == 2:
-    model = ViViTBackbone(t = frames_per_clip, h = opt.image_size, w = opt.image_size, patch_t = patch_size, patch_h = patch_size, patch_w = patch_size, num_classes = num_classes, dim = 512, depth = 6, heads 10 , mlp_dim = 8, model = 3)
 else:
     model = ViViT(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
     
