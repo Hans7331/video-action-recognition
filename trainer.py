@@ -280,7 +280,7 @@ torch.save(model.state_dict(), 'model_save/vivit-last-model-parameters.pt')
 
 
 
-
+# change
 
 
 
