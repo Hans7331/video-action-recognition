@@ -26,10 +26,10 @@ import pickle
 import zipfile
 import opt
 
-#from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
+from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
 from Dataset import ActivityNet
-from vivit_model1 import ViViT_1, ViViT_2
-from model import ViViT
+from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
+from model_2_scratch import ViViT as model_2_scratch
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
 
@@ -100,7 +100,6 @@ class Driver:
 
                 total_loss += loss.item()
 
-                #corrects+= (torch.argmax(prediction,dim=1)==labels).sum() #convert to vector
                 # calculating the accuracy per class
                 prediction_1 = torch.argmax(prediction,dim=1)
                 for c in range(num_classes):
@@ -118,7 +117,8 @@ class Driver:
         tb_writer.add_scalar("Validation/Loss",total_loss/len(loader),epoch)
         tb_writer.add_scalar("Validation/Accuracy",accuracy,epoch)
         print("Validation Accuracy: {:05.5f}, over {:f}/{:d} vsamples and {:d} classes".format(accuracy, corrects.sum(), num_videos, (corrects>0).sum()), flush=True)
-        # checkpoint_saver(model,epoch,total_loss/len(loader))
+        if opt.checkpoint_flag:
+            checkpoint_saver(model,epoch,total_loss/len(loader))
 
         return accuracy, epoch_loss, confusion_matrix
     
@@ -219,9 +219,9 @@ test_loader = DataLoader(test_data, batch_size=test_batch_size)
 
 # initialize model and plot on tensorboard
 if opt.pr == 1:
-    model = ViViT_2(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
-else:
-    model = ViViT(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
+    model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
+elif opt.pr == 0:
+    model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
     
 frames, _ = next(iter(train_loader))
 #tb_writer.add_graph(model, frames)
@@ -232,8 +232,9 @@ loss_criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(),lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
 
-#Intialising the checkpoint saver
-# checkpoint_saver = CheckpointSaver(dirpath='./model_weights7', decreasing=True, top_n=5)
+# Intialising the checkpoint saver
+if opt.checkpoint_flag: 
+    checkpoint_saver = CheckpointSaver(dirpath='./model_weights7', decreasing=True, top_n=5)
 
 #intializing the class names and class length
 if opt.dataset == 'UCF101':
@@ -261,12 +262,13 @@ for epoch in tqdm(range(1,epochs+1)):
         #plot_confuse_matrix(confusion_matrix, class_names, normalize=True, title='Normalized confusion matrix')
         #cm_to_tb = add_cm_to_tb("Test Diagonal matrix.png")
         #tb_writer.add_image("Confusion Matrix",cm_to_tb,epoch)    
+        
     if val_accuracy > best_accuracy: 
         torch.save(model, '../model_save/vivit-best-model.pt')
         torch.save(model.state_dict(), '../model_save/vivit-best-model-parameters.pt')
 
-print(np.diag(np.array(confusion_matrix)))
-print(np.diag(np.array(confusion_matrix_test)))
+print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
+print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
         
 torch.save(model,"../model_save/vivit-last-model.pt")
 torch.save(model.state_dict(), '../model_save/vivit-last-model-parameters.pt')

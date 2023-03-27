@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import pickle
 import zipfile
 
-'''
+
 class UCFDataset(torch.utils.data.Dataset):
     """
     Dataset Class for reading UCF101 dataset  
@@ -120,7 +120,7 @@ def get_ucf101_class_length():
     for val in class_length.values():
         class_len.append(val)
     return class_length, class_len
-'''
+
 
 
 # videoloader and other function for running acitivitynet
