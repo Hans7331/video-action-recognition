@@ -183,7 +183,7 @@ train_perc = opt.tt_split # 80% as training , 20% as validation
 
 #Dataset Intialization
 if opt.dataset == 'UCF101':
-    from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
+    from ucf_dataset import UCFDataset,get_ucf101_class_length
     train_val_data = UCFDataset( dataset_dir = dataset_dir, subset="train", video_list_file="trainlist01.txt",frames_per_clip=frames_per_clip)
     train_len=int(opt.tt_split*len(train_val_data))
     train_val_split = [ train_len, len(train_val_data) - train_len ]
@@ -196,7 +196,7 @@ if opt.dataset == 'UCF101':
     print(f"Test samples: {len(test_data)}")
 
 else:
-    from Dataset import ActivityNet
+    from anet_dataset import ActivityNet
     train_data = ActivityNet(root_path = dataset_dir, annotation_path = annotation_path, subset = 'training', num_frames = frames_per_clip)
 
     class_names = train_data.class_names # saving class names
