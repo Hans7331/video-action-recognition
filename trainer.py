@@ -26,10 +26,6 @@ import pickle
 import zipfile
 import opt
 
-if opt.dataset != 'Anet':
-    from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
-if opt.dataset == 'Anet':
-    from Dataset import ActivityNet
 from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
 from model_2_scratch import ViViT as model_2_scratch
 from checkpoint_saver import CheckpointSaver
@@ -187,7 +183,7 @@ train_perc = opt.tt_split # 80% as training , 20% as validation
 
 #Dataset Intialization
 if opt.dataset == 'UCF101':
-    
+    from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
     train_val_data = UCFDataset( dataset_dir = dataset_dir, subset="train", video_list_file="trainlist01.txt",frames_per_clip=frames_per_clip)
     train_len=int(opt.tt_split*len(train_val_data))
     train_val_split = [ train_len, len(train_val_data) - train_len ]
@@ -200,7 +196,7 @@ if opt.dataset == 'UCF101':
     print(f"Test samples: {len(test_data)}")
 
 else:
-    
+    from Dataset import ActivityNet
     train_data = ActivityNet(root_path = dataset_dir, annotation_path = annotation_path, subset = 'training', num_frames = frames_per_clip)
 
     class_names = train_data.class_names # saving class names
