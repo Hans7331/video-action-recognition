@@ -26,8 +26,10 @@ import pickle
 import zipfile
 import opt
 
-from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
-from Dataset import ActivityNet
+if opt.dataset != 'Anet':
+    from Dataset import UCFDataset,get_ucf101_class_length, ActivityNet
+if opt.dataset == 'Anet':
+    from Dataset import ActivityNet
 from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
 from model_2_scratch import ViViT as model_2_scratch
 from checkpoint_saver import CheckpointSaver
@@ -262,7 +264,7 @@ for epoch in tqdm(range(1,epochs+1)):
         #plot_confuse_matrix(confusion_matrix, class_names, normalize=True, title='Normalized confusion matrix')
         #cm_to_tb = add_cm_to_tb("Test Diagonal matrix.png")
         #tb_writer.add_image("Confusion Matrix",cm_to_tb,epoch)    
-        
+
     if val_accuracy > best_accuracy: 
         torch.save(model, '../model_save/vivit-best-model.pt')
         torch.save(model.state_dict(), '../model_save/vivit-best-model-parameters.pt')
