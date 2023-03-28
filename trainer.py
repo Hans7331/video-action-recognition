@@ -28,6 +28,8 @@ import opt
 
 from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
 from model_2_scratch import ViViT as model_2_scratch
+from model_pretrained_all_layers import ViViT_2 as model_2_pretrained_all_layers
+
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
 
@@ -217,10 +219,12 @@ test_loader = DataLoader(test_data, batch_size=test_batch_size)
 
 # initialize model and plot on tensorboard
 if opt.pr == 1:
-    model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
+    model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = False)
 elif opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
-    
+elif opt.pr == 2:
+    model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
+
 frames, _ = next(iter(train_loader))
 #tb_writer.add_graph(model, frames)
 model.to(device)
