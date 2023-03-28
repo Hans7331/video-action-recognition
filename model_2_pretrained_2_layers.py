@@ -17,7 +17,6 @@ def pretrained_pos_embedding(frames_per_clip):
     for key,value in checkpoint.items():
         if key.startswith('pos_embed'):
             pos_embed_weights[key] = value
-    print(pos_embed_weights.keys())
     x  = pos_embed_weights.values()
     y = next(iter(x))
     y =  repeat(y, 'v n d -> v f n d', f = frames_per_clip)
