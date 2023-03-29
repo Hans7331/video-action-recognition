@@ -226,7 +226,7 @@ elif opt.pr == 2:
 
 # if using the all layered pretriained model
 
-checkpoint = torch.load("../pretrain_wieghts/pre_32f.pt",map_location=torch.device('cuda:0'))
+checkpoint = torch.load("../pretrain_weights/pre_32f.pt",map_location=torch.device('cuda:0'))
 unmatched = model.load_state_dict(checkpoint,strict = False)
 for i in unmatched.missing_keys:
     print(i)
