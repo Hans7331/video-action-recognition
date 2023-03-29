@@ -3,7 +3,7 @@
 #SBATCH --time=90:00:00
 #SBATCH --cpus-per-task=15
 #SBATCH --mem=128G
-#SBATCH --output=../anet_output/test_pretrain-pass-1.out
+#SBATCH --output=../anet_output/test_pretrain-all-layer.out
 
 module load anaconda
-srun python trainer.py --annot_dir "../anet_annotations/activitynet-3-category.json" --num_classes 3 --epochs 1 --lr 0.1 --dataset "Anet" --batch_size 32 --frames_per_clip 32 --pr 1
+srun python trainer.py --annot_dir "../anet_annotations/activitynet-3-category.json" --num_classes 3 --epochs 1 --lr 0.1 --dataset "Anet" --batch_size 32 --frames_per_clip 32 --pr 2
