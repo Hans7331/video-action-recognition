@@ -6,4 +6,4 @@
 #SBATCH --output=../anet_output/test_tube-false-fpc.out
 
 module load anaconda
-srun python trainer.py --annot_dir "../anet_annotations/activitynet-3-category.json" --num_classes 3 --epochs 1 --lr 0.1 --dataset "Anet" --batch_size 16 --frames_per_clip 32 --pr 1
+srun python trainer.py --annot_dir "../anet_annotations/activitynet-3-category.json" --num_classes 3 --epochs 1 --lr 0.1 --dataset "Anet" --batch_size 32 --frames_per_clip 32 --pr 1
