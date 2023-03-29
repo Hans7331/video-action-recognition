@@ -12,7 +12,7 @@ from pytorch_pretrained_vit import ViT
 # position embedding technique(explained in section 3.4)
 
 def pretrained_pos_embedding(frames_per_clip):
-    checkpoint = torch.load('vit.pth',map_location=torch.device('cpu'))
+    checkpoint = torch.load('../pretrain_weights/vit.pth',map_location=torch.device('cpu'))
     pos_embed_weights = OrderedDict()
     for key,value in checkpoint.items():
         if key.startswith('pos_embed'):
