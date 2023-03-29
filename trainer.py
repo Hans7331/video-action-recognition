@@ -269,6 +269,9 @@ for epoch in tqdm(range(1,epochs+1)):
         torch.save(model, '../model_save/vivit-best-model.pt')
         torch.save(model.state_dict(), '../model_save/vivit-best-model-parameters.pt')
 
+    print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
+    print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
+
 print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
 print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
         
