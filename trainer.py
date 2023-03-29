@@ -219,7 +219,7 @@ test_loader = DataLoader(test_data, batch_size=test_batch_size)
 
 # initialize model and plot on tensorboard
 if opt.pr == 1:
-    model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = False)
+    model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = False, dim = 192)
 elif opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 elif opt.pr == 2:
