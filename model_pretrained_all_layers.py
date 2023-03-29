@@ -200,13 +200,13 @@ class ViViT_2(nn.Module):
     def forward(self, x):
 
         # get patch embeddings
-        print("orignal shape", x.shape)
+        #print("orignal shape", x.shape)
         x = x.permute(0,2,1,3,4)
-        print("shape after permute: ", x.shape)
+        #print("shape after permute: ", x.shape)
         x = self.tube(x)
-        print("shape after tube: ", x.shape)
+        #print("shape after tube: ", x.shape)
         x =  rearrange(x, 'b c t h w -> b t (h w) c')
-        print("shape after rearrange: ", x.shape)
+        #print("shape after rearrange: ", x.shape)
         #x = self.get_patch_emb(x)
 
         # b = batch_size , t = frames , n = number of patch embeddings= 14*14 , e = embedding size
