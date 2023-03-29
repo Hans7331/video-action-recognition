@@ -27,6 +27,7 @@ import zipfile
 import opt
 
 from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
+from model_pretrained_all_layers import ViViT_2 as model_2_pretrained_all_layers
 from model_2_scratch import ViViT as model_2_scratch
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
@@ -220,13 +221,15 @@ if opt.pr == 1:
     model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
 elif opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
+elif opt.pr == 2:
+    model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 
 # if using the all layered pretriained model
 
-#checkpoint = torch.load("pre_32f.pt",map_location=torch.device('cuda:0'))
-#unmatched = model.load_state_dict(checkpoint,strict = False)
-#for i in unmatched.missing_keys:
-    #print(i)
+checkpoint = torch.load("../pretrain_wieghts/pre_32f.pt",map_location=torch.device('cuda:0'))
+unmatched = model.load_state_dict(checkpoint,strict = False)
+for i in unmatched.missing_keys:
+    print(i)
 
 frames, _ = next(iter(train_loader))
 #tb_writer.add_graph(model, frames)
@@ -271,6 +274,9 @@ for epoch in tqdm(range(1,epochs+1)):
     if val_accuracy > best_accuracy: 
         torch.save(model, '../model_save/vivit-best-model.pt')
         torch.save(model.state_dict(), '../model_save/vivit-best-model-parameters.pt')
+
+    print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
+    print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
 
 print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
 print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
