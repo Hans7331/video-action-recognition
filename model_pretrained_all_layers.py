@@ -8,8 +8,43 @@ from einops.layers.torch import Rearrange
 from PIL import Image
 import torchvision.models as models
 from collections import OrderedDict
+from pytorch_pretrained_vit import ViT
+
+#Tests
+# how does dropout affect the test accuracy -> have to add dropout to this code
+# effect of softmaxing at the end on accuracy
+# weired code in the  attention module what does it do with nn.Identity()
+# number of head should be 12 for using all layers of the pretrained model
 
 
+def pretrained_pos_embedding(frames_per_clip):
+    checkpoint = torch.load('vit.pth',map_location=torch.device('cpu'))
+    pos_embed_weights = OrderedDict()
+    for key,value in checkpoint.items():
+        if key.startswith('pos_embed'):
+            pos_embed_weights[key] = value
+    x  = pos_embed_weights.values()
+    y = next(iter(x))
+    y =  repeat(y, 'v n d -> v f n d', f = frames_per_clip)
+    pos_embed_weights['pos_embed'] = y
+    #torch.save(pos_embed_weights, 'pos_embed.pt')
+    return y
+
+model= ViT('B_16_imagenet1k', pretrained=True)
+patch_weight = model.patch_embedding.weight
+
+def inflate_2d_filter_to_3d(filter_2d, num_frames, num_channels_in, num_channels_out, filter_height, filter_width):
+    # Initialize a 3D filter with zeros
+    filter_3d = torch.zeros((num_channels_out ,num_channels_in,num_frames, filter_height, filter_width))
+
+
+    # Inflate the 2D filter by replicating it along the temporal dimension and averaging them
+    filter_2d_1 = filter_2d.clone().detach().cpu().numpy()
+    
+    for i in range(num_frames):
+        filter_3d[:, :, i, :, :] = torch.tensor(filter_2d_1).float()/ num_frames
+
+    return filter_3d
 
 
 
@@ -60,7 +95,7 @@ class MLP(nn.Module):
 
 class Attention(nn.Module):
     """
-        dim: (int) - inner dimension of embeddings[default:192] 
+        dim: (int) - inner dimension of embeddings[default:768] 
         heads: (int) - number of attention heads[default:12] # for pretrained model
         dim_head: (int) - dimension of transformer head [default:64] 
     
@@ -162,15 +197,28 @@ class ViViT_2(nn.Module):
     
     """
 
-    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4 ):
+    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False ):
         
         super().__init__()
 
         num_patches = (image_size // patch_size) ** 2   # => 196 for 224x224 images
         patch_dim = in_channels * patch_size ** 2      # => 3*16*16
 
+        assert pooling in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
 
-        self.tube = TubeletEmbeddings((32,3, 224,224), (1,16,16), num_channels=3, embed_dim=768)
+
+        assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
+
+        # tubelet embedding
+        self.tube = tube
+        self.tubelet_emb = TubeletEmbeddings((32,3, 224,224), (1,16,16), num_channels=3, embed_dim=768)
+
+        #patch embedding
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b t c (h p1) (w p2) -> b t (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
+            nn.Linear(patch_dim, dim),
+        )
+
 
         # position embeddings of shape: (1, frames_per_clip = 16, num_patches + 1 = 197, 192)
         self.pos_embed = nn.Parameter(torch.randn(1, frames_per_clip, num_patches + 1, dim))
@@ -194,20 +242,17 @@ class ViViT_2(nn.Module):
         self.classifier_head = nn.Sequential(
             nn.LayerNorm(dim),
             nn.Linear(dim, num_classes),
-            nn.Softmax(dim=1)
+            #nn.Softmax(dim=1)             #-> difference from 2 pretrained layer code
         )
 
     def forward(self, x):
 
-        # get patch embeddings
-        print("orignal shape", x.shape)
-        x = x.permute(0,2,1,3,4)
-        print("shape after permute: ", x.shape)
-        x = self.tube(x)
-        print("shape after tube: ", x.shape)
-        x =  rearrange(x, 'b c t h w -> b t (h w) c')
-        print("shape after rearrange: ", x.shape)
-        #x = self.get_patch_emb(x)
+        if self.tube==True:
+            x = x.permute(0,2,1,3,4)
+            x = self.tubelet_emb(x)
+            x =  rearrange(x, 'b c t h w -> b t (h w) c')
+        else:
+            x = self.to_patch_embedding(x)
 
         # b = batch_size , t = frames , n = number of patch embeddings= 14*14 , e = embedding size
         b, t, n, e = x.shape     # x.shape = (b, t, 196, 192) 
@@ -217,7 +262,6 @@ class ViViT_2(nn.Module):
 
         # concatenate cls_token to the patch embedding
         x = torch.cat((spatial_cls_tokens, x), dim=2)     # => x shape = ( b, t, 197 ,192)
-        print(x.shape)
 
         # add position embedding info 
         x += self.pos_embed[:, :, :(n + 1)]

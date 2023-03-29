@@ -220,7 +220,14 @@ if opt.pr == 1:
     model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = True)
 elif opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
-    
+
+# if using the all layered pretriained model
+
+#checkpoint = torch.load("pre_32f.pt",map_location=torch.device('cuda:0'))
+#unmatched = model.load_state_dict(checkpoint,strict = False)
+#for i in unmatched.missing_keys:
+    #print(i)
+
 frames, _ = next(iter(train_loader))
 #tb_writer.add_graph(model, frames)
 model.to(device)
