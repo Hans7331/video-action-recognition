@@ -211,7 +211,7 @@ class ViViT_2(nn.Module):
 
         # tubelet embedding
         self.tube = tube
-        self.tubelet_emb = TubeletEmbeddings((32,3, 224,224), (1,16,16), num_channels=3, embed_dim=768)
+        self.tubelet_emb = TubeletEmbeddings((frames_per_clip,3, image_size,image_size), (1,16,16), num_channels=3, embed_dim=768)
 
         #patch embedding
         self.to_patch_embedding = nn.Sequential(
