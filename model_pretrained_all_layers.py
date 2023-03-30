@@ -11,7 +11,6 @@ from collections import OrderedDict
 from pytorch_pretrained_vit import ViT
 
 #Tests
-# how does dropout affect the test accuracy -> have to add dropout to this code
 # effect of softmaxing at the end on accuracy
 # weired code in the  attention module what does it do with nn.Identity()
 # number of head should be 12 for using all layers of the pretrained model
@@ -79,15 +78,15 @@ class TubeletEmbeddings(nn.Module):
 class MLP(nn.Module):
     
     # dim - inner dims of embedding , inner_dim - dim of the transformer
-    def __init__(self, dim, inner_dim):
+    def __init__(self, dim, inner_dim,dropout = 0.):
         super().__init__()
         # mlp with GELU activation function
         self.mlp = nn.Sequential(
             nn.Linear(dim, inner_dim),
             nn.GELU(),
-            #nn.Linear(inner_dim, inner_dim),
-            #nn.GELU(),
+            nn.Dropout(dropout),
             nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
         )
 
     def forward(self, x):
@@ -101,7 +100,7 @@ class Attention(nn.Module):
     
     """
 
-    def __init__(self, dim = 768, heads = 12, dim_head = 64):
+    def __init__(self, dim = 768, heads = 12, dim_head = 64,dropout = 0.):
         super().__init__()
         inner_dim = dim_head *  heads 
         #project_out = not (heads == 1 and dim_head == dim)
@@ -113,7 +112,7 @@ class Attention(nn.Module):
         self.make_qkv = nn.Linear(dim, inner_dim *3) 
 
         # Linear projection to required output dimension
-        self.get_output = nn.Sequential(nn.Linear(inner_dim, dim))
+        self.get_output = nn.Sequential(nn.Linear(inner_dim, dim),nn.Dropout(dropout))
         #if project_out else nn.Identity()
         
 
@@ -153,7 +152,7 @@ class Transformer(nn.Module):
     
     """
 
-    def __init__(self, dim, depth, heads=8, dim_head=64, mlp_dim=3072):
+    def __init__(self, dim, depth, heads=8, dim_head=64, mlp_dim=3072,dropout = 0.):
         super().__init__()
         
         self.model_layers = nn.ModuleList([])
@@ -161,9 +160,9 @@ class Transformer(nn.Module):
             self.model_layers.append(nn.ModuleList([
                 nn.LayerNorm(dim),
                 #nn.MultiheadAttention(dim, heads,batch_first=True),
-                Attention(dim, heads, dim_head),
+                Attention(dim, heads, dim_head,dropout=dropout),
                 nn.LayerNorm(dim),
-                MLP(dim, mlp_dim)
+                MLP(dim, mlp_dim,dropout=dropout)
             ]))
 
         self.layer_norm = nn.LayerNorm(dim)
@@ -197,7 +196,7 @@ class ViViT_2(nn.Module):
     
     """
 
-    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False ):
+    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False, dropout = 0.,emb_dropout = 0.):
         
         super().__init__()
 
@@ -227,15 +226,16 @@ class ViViT_2(nn.Module):
         self.spatial_token = nn.Parameter(torch.randn(1, 1, dim))
         
         # spatial transformer ViT
-        self.spatial_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim)
+        self.spatial_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim,dropout)
 
         # time dimention tokens of shape: (1, 1, 192). 
         self.temporal_token = nn.Parameter(torch.randn(1, 1, dim))
         
         # temporal transformer which takes in spacetransformer's output tokens as the input. 
-        self.temporal_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim)
+        self.temporal_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim,dropout)
 
         # pooling type, could be "mean" or "cls"
+        self.dropout =  nn.Dropout(emb_dropout)
         self.pooling = pooling
 
         # mlp head for final classification
@@ -265,6 +265,9 @@ class ViViT_2(nn.Module):
 
         # add position embedding info 
         x += self.pos_embed[:, :, :(n + 1)]
+        
+        #add embedding dropout
+        x = self.dropout(x)
 
         # club together the b & t dimension 
         x = rearrange(x, 'b t n d -> (b t) n d')
