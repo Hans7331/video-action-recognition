@@ -222,7 +222,7 @@ if opt.pr == 1:
 elif opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 elif opt.pr == 2:
-    model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip, tube = False, dropout = 0.3 ,emb_dropout = 0.3 )
+    model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip, tube = True, dropout = 0.1 ,emb_dropout = 0.1 )
 
 # if using the all layered pretriained model
 
