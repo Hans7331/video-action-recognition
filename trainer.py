@@ -225,11 +225,15 @@ if opt.pr == 1:
 elif opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 elif opt.pr == 2:
-    model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip, tube = False, dropout = 0 ,emb_dropout = 0 )
+    model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip, tube = False, dropout = 0 ,emb_dropout = 0, str = opt.str )
 
 # if using the all layered pretriained model
 
-checkpoint = torch.load("../pretrain_weights/pre_32f.pt",map_location=torch.device('cuda:0'))
+if opt.str == 1:
+    checkpoint = torch.load("../pretrain_weights/pre_32f.pt",map_location=torch.device('cuda:0'))
+elif opt.str == 2:
+    checkpoint = torch.load("../pretrain_weights/pre_16f.pt",map_location=torch.device('cuda:0'))
+
 unmatched = model.load_state_dict(checkpoint,strict = False)
 for i in unmatched.missing_keys:
     print(i)

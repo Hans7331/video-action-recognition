@@ -196,7 +196,7 @@ class ViViT_2(nn.Module):
     
     """
 
-    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False, dropout = 0.,emb_dropout = 0.):
+    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False, dropout = 0.,emb_dropout = 0., str = 1):
         
         super().__init__()
 
@@ -210,7 +210,7 @@ class ViViT_2(nn.Module):
 
         # tubelet embedding
         self.tube_flag = tube
-        self.tube = TubeletEmbeddings((frames_per_clip,3, image_size,image_size), (1,16,16), num_channels=3, embed_dim=768)
+        self.tube = TubeletEmbeddings((frames_per_clip,3, image_size,image_size), (str,16,16), num_channels=3, embed_dim=768)
 
         #patch embedding
         self.to_patch_embedding = nn.Sequential(
@@ -220,7 +220,7 @@ class ViViT_2(nn.Module):
 
 
         # position embeddings of shape: (1, frames_per_clip = 16, num_patches + 1 = 197, 192)
-        self.pos_embed = nn.Parameter(torch.randn(1, frames_per_clip, num_patches + 1, dim))
+        self.pos_embed = nn.Parameter(torch.randn(1, frames_per_clip/str, num_patches + 1, dim))
 
         # space (i.e. for each image) tokens of shape: (1, 1, 192). The 192 is the tokens obtained in "get_patch_emb" 
         self.spatial_token = nn.Parameter(torch.randn(1, 1, dim))
