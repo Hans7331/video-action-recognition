@@ -265,6 +265,7 @@ class ViViT_2(nn.Module):
 
         # add position embedding info 
         print(x.shape)
+        print(self.pos_embed.shape)
         x += self.pos_embed[:, :, :(n + 1)]
         print(x.shape)
         
