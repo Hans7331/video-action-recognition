@@ -82,7 +82,7 @@ class VideoLoader(object):
             
         video = [self.transform(pil) for pil in pils]
         print(video[0].shape)
-        video = [get_vector(pil) for pil in pils]
+        video = [get_vector(vid) for vid in video]
         print(video[0].shape)
 
         return video
