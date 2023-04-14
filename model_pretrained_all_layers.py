@@ -209,8 +209,8 @@ class ViViT_2(nn.Module):
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
 
         # tubelet embedding
-        self.tube = tube
-        self.tubelet_emb = TubeletEmbeddings((frames_per_clip,3, image_size,image_size), (1,16,16), num_channels=3, embed_dim=768)
+        self.tube_flag = tube
+        self.tube = TubeletEmbeddings((frames_per_clip,3, image_size,image_size), (1,16,16), num_channels=3, embed_dim=768)
 
         #patch embedding
         self.to_patch_embedding = nn.Sequential(
@@ -247,9 +247,9 @@ class ViViT_2(nn.Module):
 
     def forward(self, x):
 
-        if self.tube==True:
+        if self.tube_flag==True:
             x = x.permute(0,2,1,3,4)
-            x = self.tubelet_emb(x)
+            x = self.tube(x)
             x =  rearrange(x, 'b c t h w -> b t (h w) c')
         else:
             x = self.to_patch_embedding(x)
