@@ -42,7 +42,7 @@ def get_vector(image):
     # 5. Attach that function to our selected layer
     h = layer.register_forward_hook(copy_data)
     # 6. Run the model on our transformed image
-    model(t_img)
+    model(image)
     # 7. Detach our copy function from the layer
     h.remove()
     # 8. Return the feature vector
