@@ -61,6 +61,9 @@ class Driver:
 
             optimizer.zero_grad()
             prediction = model(video_data)
+
+            print(prediction.shape)
+            print(labels.shape)
             loss = loss_criterion(prediction,labels)
             total_epoch_loss += loss.item()
             loss.backward()
