@@ -200,7 +200,7 @@ if opt.dataset == 'UCF101':
     print(f"Test samples: {len(test_data)}")
 
 else:
-    from anet_dataset import ActivityNet
+    from anet_dataset_modified import ActivityNet
     train_data = ActivityNet(root_path = dataset_dir, annotation_path = annotation_path, subset = 'training', num_frames = frames_per_clip)
 
     class_names = train_data.class_names # saving class names
