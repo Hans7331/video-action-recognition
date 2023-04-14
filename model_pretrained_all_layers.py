@@ -264,10 +264,7 @@ class ViViT_2(nn.Module):
         x = torch.cat((spatial_cls_tokens, x), dim=2)     # => x shape = ( b, t, 197 ,192)
 
         # add position embedding info 
-        print(x.shape)
-        print(self.pos_embed.shape)
         x += self.pos_embed[:, :, :(n + 1)]
-        print(x.shape)
         
         #add embedding dropout
         x = self.dropout(x)
