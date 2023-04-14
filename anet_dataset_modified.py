@@ -68,6 +68,26 @@ def create_feature_extractor(net_type, name_layer):
         num_cascade = 4
     return net, num_channel_feature, num_cascade
 
+class DeconvBlock(nn.Module):
+    def __init__(self, num_channel_in, num_channel_out):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(num_channel_in, num_channel_out, (3, 3), padding=(1, 1)), nn.BatchNorm2d(num_channel_out), nn.ReLU())
+
+    def forward(self, x):
+        x = repeat(x, 'br c h w -> br c (h f1) (w f2)', f1=2, f2=2)
+        return self.net(x)
+
+
+class Deconv(nn.Module):
+    def __init__(self, num_cascade, num_channel_out, num_channel_feature):
+        super().__init__()
+        self.net = nn.Sequential(DeconvBlock(num_channel_feature, num_channel_out),
+                                 * [DeconvBlock(num_channel_out, num_channel_out)]*(num_cascade-1))
+
+    def forward(self, x):
+        return self.net(x)
+
 
 def get_vector(image):
     # Create a PyTorch tensor with the transformed image
