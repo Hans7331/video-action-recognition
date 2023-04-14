@@ -31,6 +31,8 @@ from model_pretrained_all_layers import ViViT_2 as model_2_pretrained_all_layers
 from model_2_scratch import ViViT as model_2_scratch
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
+from contrastive_loss import ContrastiveLoss
+
 
 
 # set device
@@ -197,7 +199,7 @@ if opt.dataset == 'UCF101':
     print(f"Test samples: {len(test_data)}")
 
 else:
-    from anet_dataset_modified import ActivityNet
+    from anet_dataset import ActivityNet
     train_data = ActivityNet(root_path = dataset_dir, annotation_path = annotation_path, subset = 'training', num_frames = frames_per_clip)
 
     class_names = train_data.class_names # saving class names
@@ -236,7 +238,9 @@ frames, _ = next(iter(train_loader))
 model.to(device)
 
 # define the loss and optimizers
-loss_criterion = nn.CrossEntropyLoss()
+#loss_criterion = nn.CrossEntropyLoss()
+loss_criterion = ContrastiveLoss()
+
 optimizer = torch.optim.Adam(model.parameters(),lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
 
