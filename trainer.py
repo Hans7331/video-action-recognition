@@ -277,12 +277,9 @@ for epoch in tqdm(range(1,epochs+1)):
 
     print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
     print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
-    print("test cm sum: ",np.sum(np.array(confusion_matrix_test), axis = 1))
-    print("test cm sum: ",np.sum(np.array(confusion_matrix_test), axis = 0))
 
 print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
 print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
-print("test cm sum: ",np.sum(np.array(confusion_matrix_test), axis = 1))
 print("test cm sum: ",np.sum(np.array(confusion_matrix_test), axis = 0))    
 
 torch.save(model,"../model_save/vivit-last-model.pt")
