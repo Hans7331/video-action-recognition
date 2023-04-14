@@ -64,7 +64,7 @@ class Driver:
 
             print(prediction.shape)
             print(labels.shape)
-            loss = loss_criterion(prediction,labels)
+            loss = loss_criterion(torch.argmax(prediction,dim=1),labels)
             total_epoch_loss += loss.item()
             loss.backward()
             optimizer.step()
