@@ -62,9 +62,7 @@ class Driver:
             optimizer.zero_grad()
             prediction = model(video_data)
 
-            print(prediction.shape)
-            print(labels.shape)
-            loss = loss_criterion(torch.argmax(prediction,dim=1),labels)
+            loss = loss_criterion(prediction,labels)
             total_epoch_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -241,8 +239,8 @@ frames, _ = next(iter(train_loader))
 model.to(device)
 
 # define the loss and optimizers
-#loss_criterion = nn.CrossEntropyLoss()
-loss_criterion = ContrastiveLoss()
+loss_criterion = nn.CrossEntropyLoss()
+#loss_criterion = ContrastiveLoss()
 
 optimizer = torch.optim.Adam(model.parameters(),lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)

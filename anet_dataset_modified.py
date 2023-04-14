@@ -41,6 +41,34 @@ transforms = tv.transforms.Compose([
     tv.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
+def create_feature_extractor(net_type, name_layer):
+    net_list = []
+    num_cascade = 0
+    num_channel_feature = 0
+
+    if net_type == 'vgg16':
+        base_model = models.vgg16().features
+        for name, layer in base_model.named_children():
+            net_list.append(layer)
+            if isinstance(layer, nn.MaxPool2d):
+                num_cascade += 1
+            if isinstance(layer, nn.Conv2d):
+                num_channel_feature = layer.out_channels
+            if name == name_layer:
+                break
+        net = nn.Sequential(*net_list)
+    elif net_type == 'ef4':
+        base_model =  models.efficientnet_b4(weights='IMAGENET1K_V1').features
+        for name, layer in base_model.named_children():
+            net_list.append(layer)
+            if name == name_layer:
+                break
+        net = nn.Sequential(*net_list)
+        num_channel_feature = 160
+        num_cascade = 4
+    return net, num_channel_feature, num_cascade
+
+
 def get_vector(image):
     # Create a PyTorch tensor with the transformed image
     t_img = transforms(image)
@@ -94,9 +122,16 @@ class VideoLoader(object):
 
             
             
-        #video = [self.transform(pil) for pil in pils]
-        video = [get_vector(pil) for pil in pils]
+        video = [self.transform(pil) for pil in pils]
         print(video[0].shape)
+        feature_extractor, x,y = create_feature_extractor(net_type = 'vgg16', name_layer = 4) 
+        print(video[0].shape)
+        video = [feature_extractor(vid) for vid in video]
+
+        print(video[0].shape)
+        
+        #video = [get_vector(pil) for pil in pils]
+        #print(video[0].shape)
 
 
         return video
