@@ -30,6 +30,7 @@ import torchvision.models as models
 from torch.autograd import Variable
 
 model = models.resnet18(pretrained=True)
+model.fc = nn.Identity()
 layer = model._modules.get('avgpool')
 model.eval()
 
@@ -44,18 +45,10 @@ def get_vector(img):
     print(t_img.shape)
     # 3. Create a vector of zeros that will hold our feature vector
     #    The 'avgpool' layer has an output size of 512
-    my_embedding = torch.zeros(512)
-    # 4. Define a function that will copy the output of a layer
-    def copy_data(m, i, o):
-        my_embedding.copy_(o.data)
-    # 5. Attach that function to our selected layer
-    h = layer.register_forward_hook(copy_data)
-    # 6. Run the model on our transformed image
-    model(t_img)
-    # 7. Detach our copy function from the layer
-    h.remove()
-    # 8. Return the feature vector
-    return my_embedding.numpy()
+    features = model(t_img)
+    print(features.shape)
+
+    return features.numpy()
 
 # videoloader and other function for running acitivitynet
 class VideoLoader(object):
