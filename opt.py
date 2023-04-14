@@ -18,6 +18,7 @@ def parse_opt():
     parser.add_argument('--dataset',type=str,default='Anet')
     parser.add_argument('--checkpoint_flag',type=int,default=0)
     parser.add_argument('--str',type=int,default=1)
+    parser.add_argument('--dropout',type=int,default=0)
     
     
     args = parser.parse_args()
