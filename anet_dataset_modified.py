@@ -35,7 +35,7 @@ model.eval()
 def get_vector(image):
     # 3. Create a vector of zeros that will hold our feature vector
     #    The 'avgpool' layer has an output size of 512
-    print(image.shape)
+    image = image.unsqueeze(0)
     my_embedding = torch.zeros(512)
     # 4. Define a function that will copy the output of a layer
     def copy_data(m, i, o):
