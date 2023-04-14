@@ -220,7 +220,7 @@ class ViViT_2(nn.Module):
 
 
         # position embeddings of shape: (1, frames_per_clip = 16, num_patches + 1 = 197, 192)
-        self.pos_embed = nn.Parameter(torch.randn(1, frames_per_clip/str, num_patches + 1, dim))
+        self.pos_embed = nn.Parameter(torch.randn(1, int(frames_per_clip//str), num_patches + 1, dim))
 
         # space (i.e. for each image) tokens of shape: (1, 1, 192). The 192 is the tokens obtained in "get_patch_emb" 
         self.spatial_token = nn.Parameter(torch.randn(1, 1, dim))
