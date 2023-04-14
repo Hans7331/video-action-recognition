@@ -29,26 +29,38 @@ import torch.nn as nn
 import torchvision.models as models
 from torch.autograd import Variable
 
+
 model = models.resnet18(pretrained=True)
-model.fc = nn.Identity()
 layer = model._modules.get('avgpool')
 model.eval()
 
-resize = transforms.Resize(256)
-center_crop = transforms.CenterCrop(224)
-normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-to_tensor = transforms.ToTensor()
+transforms = tv.transforms.Compose([
+    tv.transforms.Resize(256),
+    tv.transforms.CenterCrop(224),
+    tv.transforms.ToTensor(),
+    tv.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
 
-def get_vector(img):
-    # 2. Create a PyTorch Variable with the transformed image
-    t_img = Variable(normalize(to_tensor(center_crop(resize(img)))).unsqueeze(0))
-    print(t_img.shape)
-    # 3. Create a vector of zeros that will hold our feature vector
-    #    The 'avgpool' layer has an output size of 512
-    features = model(t_img)
-    print(features.shape)
+def get_vector(image):
+    # Create a PyTorch tensor with the transformed image
+    t_img = transforms(image)
+    # Create a vector of zeros that will hold our feature vector
+    # The 'avgpool' layer has an output size of 512
+    my_embedding = torch.zeros(512)
 
-    return features.numpy()
+    # Define a function that will copy the output of a layer
+    def copy_data(m, i, o):
+        my_embedding.copy_(o.flatten())                 # <-- flatten
+
+    # Attach that function to our selected layer
+    h = layer.register_forward_hook(copy_data)
+    # Run the model on our transformed image
+    with torch.no_grad():                               # <-- no_grad context
+        model(t_img.unsqueeze(0))                       # <-- unsqueeze
+    # Detach our copy function from the layer
+    h.remove()
+    # Return the feature vector
+    return my_embedding
 
 # videoloader and other function for running acitivitynet
 class VideoLoader(object):
@@ -83,7 +95,9 @@ class VideoLoader(object):
             
             
         #video = [self.transform(pil) for pil in pils]
+        print(video.shape)
         video = [get_vector(pil) for pil in pils]
+        print(video.shape)
 
 
         return video
