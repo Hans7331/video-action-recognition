@@ -196,7 +196,7 @@ class ViViT_2(nn.Module):
     
     """
 
-    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 10, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False, dropout = 0,emb_dropout = 0, str = 1):
+    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 12, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False, dropout = 0,emb_dropout = 0, str = 1):
         
         super().__init__()
 
