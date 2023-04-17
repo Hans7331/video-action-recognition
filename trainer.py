@@ -33,6 +33,11 @@ from model_pretrained_all_layers import ViViT_2 as model_2_pretrained_all_layers
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
 
+from contrastive_loss.nt_xent_original import *
+from contrastive_loss.global_local_temporal_contrastive import global_local_temporal_contrastive
+from ucf_dataloader_cl import ss_dataset_gen1, collate_fn2
+
+
 
 # set device
 seed = 400
@@ -186,6 +191,16 @@ train_perc = opt.tt_split # 80% as training , 20% as validation
 #Dataset Intialization
 if opt.dataset == 'UCF101':
     from ucf_dataset import UCFDataset,get_ucf101_class_length
+
+    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 0.1)
+    train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn2)    
+
+    for i, (sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
+            a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3,_ ,_,_) in enumerate(train_dataloader):
+        if i > 1:
+            break
+        print(sparse_clip)
+
     train_val_data = UCFDataset( dataset_dir = dataset_dir, subset="train", video_list_file="trainlist01.txt",frames_per_clip=frames_per_clip)
     train_len=int(opt.tt_split*len(train_val_data))
     train_val_split = [ train_len, len(train_val_data) - train_len ]
