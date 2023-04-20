@@ -213,7 +213,7 @@ class Driver:
                     corrects += (label == pred)
                 num_videos += video_data.size(0)
 
-        accuracy = corrects.sum()/num_videos
+        accuracy = corrects.item()/num_videos
 
         return accuracy*100
 
@@ -244,7 +244,7 @@ train_perc = opt.tt_split # 80% as training , 20% as validation
 if opt.dataset == 'UCF101':
     from ucf_dataset import UCFDataset,get_ucf101_class_length
 
-    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'trainlist01_sample.txt')
+    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'trainlist01.txt')
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn2)    
 
   
@@ -311,8 +311,8 @@ for epoch in range(1,epochs+1):
     scheduler.step()
 
         
-Driver.test_model(model, test_dataloader)
-
+test_accuracy = Driver.test_model(model, test_dataloader)
+print("Test Accuracy", test_accuracy)
 
 torch.save(model,"../model_save/vivit-last-model.pt")
 torch.save(model.state_dict(), '../model_save/vivit-last-model-parameters.pt')
