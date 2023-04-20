@@ -76,17 +76,20 @@ class Driver:
             print("Learning rate is: {}".format(param_group['lr']))
     
         losses = []
+        labels = []
         losses_gsr_gdr, losses_ic2, losses_ic1, losses_local_local = [], [], [], []
         losses_global_local = []
 
         model.train()
 
+        #for i, j in enumerate(data_loader):
+        #    print(j[-1])
+
         for i, (sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
-                a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3,_ ,_,_) in enumerate(data_loader):
+                a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3,_ ,_,_,label) in enumerate(data_loader):
             
+            labels.append(label)
             optimizer.zero_grad()
-            
-                
             a_sparse_clip = a_sparse_clip.permute(0,1,2,3,4).to(device) #aug_DL output is [120, 16, 3, 112, 112]], model expects [8, 3, 16, 112, 112]
             a_dense_clip0 = a_dense_clip0.permute(0,1,2,3,4).to(device)        
             a_dense_clip1 = a_dense_clip1.permute(0,1,2,3,4).to(device)
@@ -157,6 +160,7 @@ class Driver:
                         loss_global_local += criterion2(torch.stack(out_sparse[ii][1:],dim=1), torch.stack(out_dense[jj],dim=1), opt.temperature)
 
                 loss = loss_ic2 + loss_ic1 + loss_local_local + loss_global_local
+                
 
             loss_unw = loss_ic2.item()+ loss_ic1.item() + loss_local_local.item() + loss_global_local.item()
             
@@ -185,77 +189,33 @@ class Driver:
         
         del out_sparse, out_dense, loss, loss_ic2, loss_ic1, losses_local_local, loss_global_local
 
-        return model, np.mean(losses), scaler
-
-    def train_step(loader,epoch):
-
-        model.train()
-        num_videos = 0
-        total_epoch_loss=0
-        corrects=torch.zeros(1, num_classes).to(device)
-
-        for batch_id, (video_data,labels) in enumerate(loader):
-            video_data,labels = video_data.to(device), labels.to(device)
-
-            optimizer.zero_grad()
-            prediction = model(video_data)
-            loss = loss_criterion(prediction,labels)
-            total_epoch_loss += loss.item()
-            loss.backward()
-            optimizer.step()
-
-            prediction = torch.argmax(prediction,dim=1)
-            for c in range(num_classes):
-                corrects[0,c] += (prediction[labels==c]==c).sum()
-            num_videos += video_data.size(0)
-
-            tb_writer.add_scalar("Train Loss/Minibatch",loss.item(),((len(loader))*(epoch-1))+ batch_id)
-
-        tb_writer.add_scalar("Train Loss/Epochs", total_epoch_loss/len(loader),epoch)
-        accuracy = corrects.sum()/num_videos*100.0
-        #tb_writer.add_scalar("Train Accuracy/Epochs",accuracy)
-        print("Train Loss/Epochs: {:06.5f}/epoch {:d} ".format(total_epoch_loss/len(loader),epoch))
-        print("Train Accuracy: {:05.5f}, over {:f}/{:d} vsamples and {:d} classes".format(accuracy, corrects.sum(), num_videos, (corrects>0).sum()), flush=True)
-
-        return total_epoch_loss/len(loader)  
-    
+        return model, np.mean(losses), scaler, labels
 
     # Test step for each epoch
-    def test_model(loader,epoch):
+    def test_model(model, test_dataloader):
 
         num_videos = 0
         model.eval()
-        #corrects=0
-        corrects=torch.zeros(1, num_classes).to(device)
+        corrects=0
 
-        #Intialized the confusion matrix
-        confusion_matrix = np.zeros((num_classes,num_classes))
         with torch.no_grad():
-            for batch_id, (video_data,labels) in enumerate(loader):
+            for batch_id, (video_data,labels) in enumerate(test_dataloader):
+                
+                video_data, labels = video_data.to(device), labels.to(device)
+                prediction = model( (video_data.permute(0,1,2,3,4), "d"))
 
-                video_data,labels = (video_data).to(device), labels.to(device)
-
-                prediction = model(video_data)
-                #loss = loss_criterion(prediction,labels)
-                #total_loss += loss.item()
-                #corrects+= (torch.argmax(prediction,dim=1)==labels).sum()
-
-                # calculating the accuracy per class
+                prediction = prediction[:,0:101]
                 prediction_1 = torch.argmax(prediction,dim=1)
-                for c in range(num_classes):
-                    corrects[0,c] += (prediction_1[labels==c]==c).sum()
+
+                #prediction_1 [0,0,0,0]
+                #labels [0,0,0,0]
+                for label, pred in zip(labels, prediction_1):
+                    corrects += (label == pred)
                 num_videos += video_data.size(0)
 
-                #update the confusion matrix
-                _,max_preds= torch.max(prediction, dim=1)
-                for t, p in zip(labels.view(-1), max_preds.view(-1)):
-                    confusion_matrix[t.long(), p.long()] += 1
+        accuracy = corrects.sum()/num_videos
 
-        accuracy = corrects.sum()/num_videos*100.0
-        #accuracy = corrects/(len(loader)*test_batch_size)
-        print("Test Accuracy: {:05.5f}, over {:f}/{:d} vsamples and {:d} classes".format(accuracy, corrects.sum(), num_videos, (corrects>0).sum()), flush=True)
-        tb_writer.add_scalar("Test/Accuracy",accuracy,epoch)
-        return accuracy,confusion_matrix 
+        return accuracy*100
 
 # ##################################################################
 
@@ -284,12 +244,13 @@ train_perc = opt.tt_split # 80% as training , 20% as validation
 if opt.dataset == 'UCF101':
     from ucf_dataset import UCFDataset,get_ucf101_class_length
 
-    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'trainlist01.txt')
+    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'trainlist01_sample.txt')
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn2)    
 
-    test_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'testlist01.txt')
-    test_dataloader = DataLoader(test_dataset, batch_size=opt.test_batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn2)   
+  
 
+    test_dataset = UCFDataset(dataset_dir = dataset_dir, subset="test", video_list_file="testlist01.txt" ,frames_per_clip=frames_per_clip)
+    test_dataloader = DataLoader(test_dataset, batch_size=test_batch_size)
 
     print(f"Train samples: {len(train_dataloader)}")
     print(f"Test samples: {len(test_dataloader)}")
@@ -343,21 +304,17 @@ best_accuracy = -1
 for epoch in range(1,epochs+1):
 
     
-    model, loss, scaler = Driver.train_epoch(scaler, opt.lr, epoch, criterion, train_dataloader, model, optimizer, criterion2 = global_local_temporal_contrastive)
+    model, loss, scaler, labels = Driver.train_epoch(scaler, opt.lr, epoch, criterion, train_dataloader, model, optimizer, criterion2 = global_local_temporal_contrastive)
     print(loss)
-    print(model)
-    #train_loss = Driver.train_step(train_dataloader, epoch)
-    
-    #accuracy_test, confusion_matrix_test = Driver.test_model(test_loader,epoch)
+
+
     scheduler.step()
 
         
+Driver.test_model(model, test_dataloader)
+
+
 torch.save(model,"../model_save/vivit-last-model.pt")
 torch.save(model.state_dict(), '../model_save/vivit-last-model-parameters.pt')
 
 # ############################ Driver functions for driving the loop
-
-
-
-
-

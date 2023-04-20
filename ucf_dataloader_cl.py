@@ -45,25 +45,32 @@ class ss_dataset_gen1(Dataset):
         self.PIL = trans.ToPILImage()
         self.TENSOR = trans.ToTensor()
         self.erase_size = 19
+        
 
     def __len__(self):
         return len(self.data)        
 
+
     def __getitem__(self,index):
+
         sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, \
                 a_sparse_clip, a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, list_sparse, list_dense, vid_path = self.process_data(index)
+
+        label = int(self.data[index].split(' ')[1]) - 1
+
         return sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, \
-                a_sparse_clip, a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, list_sparse, list_dense, vid_path
+                a_sparse_clip, a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, list_sparse, list_dense, vid_path, label
 
 
     def process_data(self, idx):
 
         vid_path = cfg.path_folder + '/UCF-101/' + self.data[idx].split(' ')[0]
+
         
         sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, \
             a_sparse_clip, a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, list_sparse, list_dense = self.build_clip(vid_path)
         return sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, \
-                a_sparse_clip, a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, list_sparse, list_dense, vid_path    
+                a_sparse_clip, a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, list_sparse, list_dense, vid_path   
 
 
     def build_clip(self, vid_path):
@@ -264,7 +271,7 @@ def collate_fn2(batch):
 
     sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
     a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, \
-    list_sparse, list_dense, vid_path = [], [], [], [], [], [], [], [], [], [], [], [], []
+    list_sparse, list_dense, vid_path , label = [], [], [], [], [], [], [], [], [], [], [], [], [], []
     for item in batch:
         if not (None in item):
             sparse_clip.append(torch.stack(item[0],dim=0)) 
@@ -283,6 +290,7 @@ def collate_fn2(batch):
             list_sparse.append(np.asarray(item[10]))
             list_dense.append(np.asarray(item[11]))
             vid_path.append(item[12])
+            label.append(item[13])
         
     
     sparse_clip = torch.stack(sparse_clip, dim=0)
@@ -299,11 +307,11 @@ def collate_fn2(batch):
 
     return sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
             a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, \
-            list_sparse, list_dense, vid_path
+            list_sparse, list_dense, vid_path, label
 
-"""        
+     
 if __name__ == '__main__':
-    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1.0)
+    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1.0, video_list_file = 'trainlist01_sample.txt')
     train_dataloader = DataLoader(train_dataset, batch_size=2, \
         shuffle=False, num_workers=4, collate_fn=collate_fn2)
     print(f'Step involved: {len(train_dataset)/24}')
@@ -318,5 +326,5 @@ if __name__ == '__main__':
             print()
 
     print(f'Time taken to load data is {time.time()-t}')
-"""
+
 

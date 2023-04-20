@@ -161,7 +161,7 @@ class ViViT_2(nn.Module):
     
     """
 
-    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4 ):
+    def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 4, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4):
         
         super().__init__()
 
@@ -211,6 +211,7 @@ class ViViT_2(nn.Module):
         self.fc2 = nn.Linear(512, 128, bias = False)
 
         self.temp_avg = nn.AdaptiveAvgPool3d((1,None,None))
+        
 
     def forward(self, x):
 
@@ -277,5 +278,7 @@ class ViViT_2(nn.Module):
                                     self.relu(self.bn1(self.fc1(x_init[:,:,i,:,:].flatten(1))))))) for i in range(4)]
             
             return x, x1, x2, x3, x4
+
+
 
         return x
