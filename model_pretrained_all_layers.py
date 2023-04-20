@@ -13,7 +13,6 @@ from collections import OrderedDict
 
 
 
-
 class TubeletEmbeddings(nn.Module):
     """
     Video to Tubelet Embedding.
@@ -193,56 +192,90 @@ class ViViT_2(nn.Module):
         # mlp head for final classification
         self.classifier_head = nn.Sequential(
             nn.LayerNorm(dim),
-            nn.Linear(dim, num_classes),
-            nn.Softmax(dim=1)
+            nn.Linear(dim, 128),
+            #nn.Softmax(dim=1)
         )
+
+        self.downsample = nn.Sequential(
+            nn.Conv3d(3, 64, (1, 2, 2), (1, 2, 2) , bias = False),
+            nn.Conv3d(64, 128, (1, 2, 2), (1, 2, 2) , bias = False),
+            nn.Conv3d(128,256, (1, 2, 2), (1, 2, 2) , bias = False),
+            nn.Conv3d(256, 512, (1, 2, 2), (1, 2, 2) , bias = False),
+            nn.AdaptiveAvgPool3d((None, 1, 1))
+        )
+
+        self.fc1 = nn.Linear(512,512, bias = True)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Linear(512, 128, bias = False)
+
+        self.temp_avg = nn.AdaptiveAvgPool3d((1,None,None))
 
     def forward(self, x):
 
-        # get patch embeddings
-        #print("orignal shape", x.shape)
-        x = x.permute(0,2,1,3,4)
-        #print("shape after permute: ", x.shape)
-        x = self.tube(x)
-        #print("shape after tube: ", x.shape)
-        x =  rearrange(x, 'b c t h w -> b t (h w) c')
-        #print("shape after rearrange: ", x.shape)
-        #x = self.get_patch_emb(x)
-
-        # b = batch_size , t = frames , n = number of patch embeddings= 14*14 , e = embedding size
-        b, t, n, e = x.shape     # x.shape = (b, t, 196, 192) 
-
-        # prepare cls_token for space transformers
-        spatial_cls_tokens = repeat(self.spatial_token, '() n d -> b t n d', b = b, t=t)
-
-        # concatenate cls_token to the patch embedding
-        x = torch.cat((spatial_cls_tokens, x), dim=2)     # => x shape = ( b, t, 197 ,192)
-        print(x.shape)
-
-        # add position embedding info 
-        x += self.pos_embed[:, :, :(n + 1)]
-
-        # club together the b & t dimension 
-        x = rearrange(x, 'b t n d -> (b t) n d')
-
-        # pass through spatial transformer
-        x = self.spatial_transformer(x)
-
-        # declub b & t dimensions
-        x = rearrange(x[:, 0], '(b t) ... -> b t ...', b=b)
-
-        # prepare cls_token for temporal transformers & concatenate cls_token to the patch embedding
-        temporal_cls_tokens = repeat(self.temporal_token, '() n d -> b n d', b=b)
-        x = torch.cat((temporal_cls_tokens, x), dim=1)
-
-        # pass through spatial transformer
-        x = self.temporal_transformer(x)
         
-        # if pooling is mean, then use mean of all 197 as the output, else use output corresponding to cls token as the final x
-        if self.pooling == 'mean':
-            x = x.mean(dim = 1) #( b, n, dim (=192) )
-        else:
-             x[:, 0] #( b, n, dim (=192) )
+        x, clip_type = x
+        x_init = x.clone()
+        if clip_type == 'd':
+        
+            # get patch embeddings
+            #print("orignal shape", x.shape)
+            x = x.permute(0,2,1,3,4)
+            #print("shape after permute: ", x.shape)
+            x = self.tube(x)
+            #print("shape after tube: ", x.shape)
+            x =  rearrange(x, 'b c t h w -> b t (h w) c')
+            #print("shape after rearrange: ", x.shape)
+            #x = self.get_patch_emb(x)
 
-        # pass through MLP classification layer
-        return self.classifier_head(x)
+            # b = batch_size , t = frames , n = number of patch embeddings= 14*14 , e = embedding size
+            b, t, n, e = x.shape     # x.shape = (b, t, 196, 192) 
+
+            # prepare cls_token for space transformers
+            spatial_cls_tokens = repeat(self.spatial_token, '() n d -> b t n d', b = b, t=t)
+
+            # concatenate cls_token to the patch embedding
+            x = torch.cat((spatial_cls_tokens, x), dim=2)     # => x shape = ( b, t, 197 ,192)
+
+            # add position embedding info 
+            x += self.pos_embed[:, :, :(n + 1)]
+
+            # club together the b & t dimension 
+            x = rearrange(x, 'b t n d -> (b t) n d')
+
+            # pass through spatial transformer
+            x = self.spatial_transformer(x)
+
+            # declub b & t dimensions
+            x = rearrange(x[:, 0], '(b t) ... -> b t ...', b=b)
+
+            # prepare cls_token for temporal transformers & concatenate cls_token to the patch embedding
+            temporal_cls_tokens = repeat(self.temporal_token, '() n d -> b n d', b=b)
+            x = torch.cat((temporal_cls_tokens, x), dim=1)
+            # pass through spatial transformer
+            x = self.temporal_transformer(x)
+            # if pooling is mean, then use mean of all 197 as the output, else use output corresponding to cls token as the final x
+            if self.pooling == 'mean':
+                x = x.mean(dim = 1) #( b, n, dim (=192) )
+            else:
+                x[:, 0] #( b, n, dim (=192) )
+            # pass through MLP classification layer
+            x = self.classifier_head(x)
+        
+        ##### sparse augmentation
+        if clip_type == 's':
+            
+            #x_init = self.downsample(x_init.permute(0,2,1,3,4))
+            x = self.temp_avg(x)
+            x = x.flatten(1)
+            
+            x = self.relu(self.bn1(self.fc1(x)))
+            x = nn.functional.normalize(self.bn2(self.fc2(x)), p=2, dim=1)
+
+            x1, x2, x3, x4 = [nn.functional.normalize(self.bn2(self.fc2(\
+                                    self.relu(self.bn1(self.fc1(x_init[:,:,i,:,:].flatten(1))))))) for i in range(4)]
+            
+            return x, x1, x2, x3, x4
+
+        return x

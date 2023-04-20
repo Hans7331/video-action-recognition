@@ -25,8 +25,9 @@ import matplotlib.pyplot as plt
 import pickle
 import zipfile
 import opt
+from torch.cuda.amp import autocast, GradScaler
 
-from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
+#from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
 from model_2_scratch import ViViT as model_2_scratch
 from model_pretrained_all_layers import ViViT_2 as model_2_pretrained_all_layers
 
@@ -37,7 +38,9 @@ from contrastive_loss.nt_xent_original import *
 from contrastive_loss.global_local_temporal_contrastive import global_local_temporal_contrastive
 from ucf_dataloader_cl import ss_dataset_gen1, collate_fn2
 
+from cl_model import *
 
+from r3d import r3d_18
 
 # set device
 seed = 400
@@ -50,9 +53,140 @@ torch.manual_seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
+def build_r3d_backbone(): #Official PyTorch R3D-18 model taken from https://github.com/pytorch/vision/blob/master/torchvision/models/video/resnet.py
+    
+    model = r3d_18(pretrained = False, progress = False)
+    #Expanding temporal dimension of the final layer by replacing temporal stride with temporal dilated convolution, this doesn't cost any additional parameters!
+
+    model.layer4[0].conv1[0] = nn.Conv3d(256, 512, kernel_size=(3, 3, 3),\
+                                stride=(1, 2, 2), padding=(2, 1, 1),dilation = (2,1,1), bias=False)
+    model.layer4[0].downsample[0] = nn.Conv3d(256, 512,\
+                          kernel_size = (1, 1, 1), stride = (1, 2, 2), bias=False)
+    return model
+
 
 ############################# Driver functions for driving the loop
 class Driver:
+
+    def train_epoch(scaler, learning_rate2, epoch, criterion, data_loader, model, optimizer, criterion2):
+        print('train at epoch {}'.format(epoch))
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = learning_rate2
+
+            print("Learning rate is: {}".format(param_group['lr']))
+    
+        losses = []
+        losses_gsr_gdr, losses_ic2, losses_ic1, losses_local_local = [], [], [], []
+        losses_global_local = []
+
+        model.train()
+
+        for i, (sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
+                a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3,_ ,_,_) in enumerate(data_loader):
+            
+            optimizer.zero_grad()
+            
+                
+            a_sparse_clip = a_sparse_clip.permute(0,1,2,3,4).to(device) #aug_DL output is [120, 16, 3, 112, 112]], model expects [8, 3, 16, 112, 112]
+            a_dense_clip0 = a_dense_clip0.permute(0,1,2,3,4).to(device)        
+            a_dense_clip1 = a_dense_clip1.permute(0,1,2,3,4).to(device)
+            a_dense_clip2 = a_dense_clip2.permute(0,1,2,3,4).to(device)
+            a_dense_clip3 = a_dense_clip3.permute(0,1,2,3,4).to(device)
+
+            sparse_clip = sparse_clip.permute(0,1,2,3,4).to(device) #aug_DL output is [120, 16, 3, 112, 112]], model expects [8, 3, 16, 112, 112]
+            dense_clip0 = dense_clip0.permute(0,1,2,3,4).to(device)        
+            dense_clip1 = dense_clip1.permute(0,1,2,3,4).to(device)
+            dense_clip2 = dense_clip2.permute(0,1,2,3,4).to(device)
+            dense_clip3 = dense_clip3.permute(0,1,2,3,4).to(device)
+            
+            # out_sparse will have output in this order: [sparse_clip[5], augmented_sparse_clip]
+            # one element from the each of the list has 5 elements: see MLP file for details
+            out_sparse = []
+            # out_dense will have output in this order : [d0,d1,d2,d3,a_d0,...]
+            out_dense = [[],[]]
+
+            with autocast():
+                
+                out_sparse.append(model((sparse_clip.cuda(),'s')))
+                out_sparse.append(model((a_sparse_clip.cuda(),'s')))
+
+                out_dense[0].append(model((dense_clip0.cuda(),'d')))
+                out_dense[0].append(model((dense_clip1.cuda(),'d')))
+                out_dense[0].append(model((dense_clip2.cuda(),'d')))
+                out_dense[0].append(model((dense_clip3.cuda(),'d')))
+
+                out_dense[1].append(model((a_dense_clip0.cuda(),'d')))
+                out_dense[1].append(model((a_dense_clip1.cuda(),'d')))
+                out_dense[1].append(model((a_dense_clip2.cuda(),'d')))
+                out_dense[1].append(model((a_dense_clip3.cuda(),'d')))
+
+
+                criterion = NTXentLoss(device = 'cuda', batch_size = out_sparse[0][0].shape[0], temperature=opt.temperature, use_cosine_similarity = False).to(device)
+                criterion_local_local = NTXentLoss(device = 'cuda', batch_size = 4, temperature=opt.temperature, use_cosine_similarity = False).to(device)
+                # Instance contrastive losses with the global clips (sparse clips)
+                
+                
+                # there 4,128
+                # ours 101
+                loss_ic2 = criterion(out_sparse[0][0], out_sparse[1][0])
+                
+
+                loss_ic1 = 0
+                
+                # Instance contrastive losses with the local clips (dense clips)
+                for ii in range(2):
+                    for jj in range(2):
+                        for chunk in range(1,5):
+                            for chunk1 in range(1,5):
+                                if (ii == jj and chunk == chunk1):
+                                    continue
+                                loss_ic1 += criterion(out_dense[ii][chunk-1],out_dense[jj][chunk1-1])
+                
+                loss_ic1 /= 4 #scaling over ii and jj
+
+                loss_local_local = 0
+                # print(out_dense[0][0].shape) # this prints shape of [4,128]
+                # print(torch.stack(out_dense[0],dim=1).shape) # this prints shape of [BS, 4, 128]
+                # exit()
+                for ii in range(out_dense[0][0].shape[0]): #for loop in the batch size
+                    loss_local_local += criterion_local_local(torch.stack(out_dense[0],dim=1)[ii], torch.stack(out_dense[1],dim=1)[ii])
+                
+                loss_global_local=0
+                for ii in range(2):
+                    for jj in range(2):
+                        loss_global_local += criterion2(torch.stack(out_sparse[ii][1:],dim=1), torch.stack(out_dense[jj],dim=1), opt.temperature)
+
+                loss = loss_ic2 + loss_ic1 + loss_local_local + loss_global_local
+
+            loss_unw = loss_ic2.item()+ loss_ic1.item() + loss_local_local.item() + loss_global_local.item()
+            
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            losses.append(loss_unw)
+            losses_local_local.append(loss_local_local.item())
+            losses_global_local.append(loss_global_local.item())
+
+            losses_ic1.append(loss_ic1.item())
+            losses_ic2.append(loss_ic2.item())
+
+            
+            if (i+1) % 25 == 0: 
+                print(f'Training Epoch {epoch}, Batch {i}, Loss: {np.mean(losses) :.5f}')
+                print(f'Training Epoch {epoch}, Batch {i}, losses_local_local: {np.mean(losses_local_local) :.5f}')
+                print(f'Training Epoch {epoch}, Batch {i}, losses_global_local: {np.mean(losses_global_local) :.5f}')
+                print(f'Training Epoch {epoch}, Batch {i}, losses_ic2: {np.mean(losses_ic2) :.5f}')
+                print(f'Training Epoch {epoch}, Batch {i}, losses_ic1: {np.mean(losses_ic1) :.5f}')
+
+            # exit()
+        print('Training Epoch: %d, Loss: %.4f' % (epoch,  np.mean(losses)))
+
+        
+        del out_sparse, out_dense, loss, loss_ic2, loss_ic1, losses_local_local, loss_global_local
+
+        return model, np.mean(losses), scaler
+
     def train_step(loader,epoch):
 
         model.train()
@@ -85,48 +219,7 @@ class Driver:
 
         return total_epoch_loss/len(loader)  
     
-    # validation step for every epoch
-    def val_step(loader,epoch):
-        model.eval()
 
-        num_videos = 0
-        total_loss=0
-        corrects=0
-        corrects=torch.zeros(1, num_classes).to(device)
-
-        #Intialized the confusion matrix
-        confusion_matrix = np.zeros((num_classes,num_classes))
-
-        with torch.no_grad():
-            for batch_id, (video_data,labels) in enumerate(loader):
-                video_data,labels = video_data.to(device), labels.to(device)
-                prediction = model(video_data)
-                loss = loss_criterion(prediction,labels)
-
-                total_loss += loss.item()
-
-                # calculating the accuracy per class
-                prediction_1 = torch.argmax(prediction,dim=1)
-                for c in range(num_classes):
-                    corrects[0,c] += (prediction_1[labels==c]==c).sum()
-                num_videos += video_data.size(0)
-
-                #update the confusion matrix
-                _,max_preds= torch.max(prediction, dim=1)
-                for t, p in zip(labels.view(-1), max_preds.view(-1)):
-                    confusion_matrix[t.long(), p.long()] += 1
-
-        accuracy = corrects.sum()/num_videos*100.0
-        epoch_loss = total_loss/(len(loader))
-        #accuracy = corrects/(len(loader)*test_batch_size)
-        tb_writer.add_scalar("Validation/Loss",total_loss/len(loader),epoch)
-        tb_writer.add_scalar("Validation/Accuracy",accuracy,epoch)
-        print("Validation Accuracy: {:05.5f}, over {:f}/{:d} vsamples and {:d} classes".format(accuracy, corrects.sum(), num_videos, (corrects>0).sum()), flush=True)
-        if opt.checkpoint_flag:
-            checkpoint_saver(model,epoch,total_loss/len(loader))
-
-        return accuracy, epoch_loss, confusion_matrix
-    
     # Test step for each epoch
     def test_model(loader,epoch):
 
@@ -168,7 +261,7 @@ class Driver:
 
 ############################# model initialisation
 tb_writer = SummaryWriter()
-device ='cuda:0' if torch.cuda.is_available() else 'cpu'
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 opt = opt.parse_opt()
 
 ############################# All parameters
@@ -187,30 +280,19 @@ annotation_path = opt.annot_dir
 train_perc = opt.tt_split # 80% as training , 20% as validation
 
 
-
 #Dataset Intialization
 if opt.dataset == 'UCF101':
     from ucf_dataset import UCFDataset,get_ucf101_class_length
 
-    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 0.1)
+    train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'trainlist01.txt')
     train_dataloader = DataLoader(train_dataset, batch_size=opt.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn2)    
 
-    for i, (sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
-            a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3,_ ,_,_) in enumerate(train_dataloader):
-        if i > 1:
-            break
-        print(sparse_clip)
+    test_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1, video_list_file = 'testlist01.txt')
+    test_dataloader = DataLoader(test_dataset, batch_size=opt.test_batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn2)   
 
-    train_val_data = UCFDataset( dataset_dir = dataset_dir, subset="train", video_list_file="trainlist01.txt",frames_per_clip=frames_per_clip)
-    train_len=int(opt.tt_split*len(train_val_data))
-    train_val_split = [ train_len, len(train_val_data) - train_len ]
 
-    train_data , val_data = random_split(train_val_data,train_val_split)
-    test_data = UCFDataset(dataset_dir = dataset_dir, subset="test", video_list_file="testlist01.txt" ,frames_per_clip=frames_per_clip)
-
-    print(f"Train samples: {len(train_data)}")
-    print(f"Validation samples: {len(val_data)}")
-    print(f"Test samples: {len(test_data)}")
+    print(f"Train samples: {len(train_dataloader)}")
+    print(f"Test samples: {len(test_dataloader)}")
 
 else:
     from anet_dataset import ActivityNet
@@ -227,21 +309,16 @@ else:
     print("Test data length :", len(test_data), "shape : " , next(iter(test_data))[0].shape)
 
 
-#Initialising Data-loaders
-train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_data, batch_size=test_batch_size)
-test_loader = DataLoader(test_data, batch_size=test_batch_size)
 
 # initialize model and plot on tensorboard
-if opt.pr == 1:
-    model = model_2_pretrained_2_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip,tube = False)
-elif opt.pr == 0:
+if opt.pr == 0:
     model = model_2_scratch(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 elif opt.pr == 2:
     model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 
-frames, _ = next(iter(train_loader))
-#tb_writer.add_graph(model, frames)
+f = build_r3d_backbone()
+model = nn.Sequential(f,model)
+
 model.to(device)
 
 # define the loss and optimizers
@@ -253,42 +330,27 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
 if opt.checkpoint_flag: 
     checkpoint_saver = CheckpointSaver(dirpath='./model_weights7', decreasing=True, top_n=5)
 
-#intializing the class names and class length
-if opt.dataset == 'UCF101':
-    class_names = train_val_data.class_names
-    class_len = get_ucf101_class_length()
-    print(class_len[0])
-
 
 # ########################### Driving train test loop  
 
 # Training Loop
 print("Starting Training")
 
+criterion = NTXentLoss(device = 'cuda', batch_size=opt.batch_size, temperature=opt.temperature, use_cosine_similarity = False)
+scaler = GradScaler()
+
 best_accuracy = -1
-for epoch in tqdm(range(1,epochs+1)):
-    train_loss = Driver.train_step(train_loader, epoch)
+for epoch in range(1,epochs+1):
+
     
-    val_accuracy , e,confusion_matrix = Driver.val_step(val_loader,epoch)
-    accuracy_test, confusion_matrix_test = Driver.test_model(test_loader,epoch)
+    model, loss, scaler = Driver.train_epoch(scaler, opt.lr, epoch, criterion, train_dataloader, model, optimizer, criterion2 = global_local_temporal_contrastive)
+    print(loss)
+    print(model)
+    #train_loss = Driver.train_step(train_dataloader, epoch)
+    
+    #accuracy_test, confusion_matrix_test = Driver.test_model(test_loader,epoch)
     scheduler.step()
-    
-    #if epoch%5 == 0:
-        #plot =  plot_confusion_matrix_diagonal(confusion_matrix,class_names, name ="Validation CM diagonal.png")
-        #plot_test = plot_confusion_matrix_diagonal(confusion_matrix_test,class_names,name ="Test Diagonal matrix.png")
-        #plot_confuse_matrix(confusion_matrix, class_names, normalize=True, title='Normalized confusion matrix')
-        #cm_to_tb = add_cm_to_tb("Test Diagonal matrix.png")
-        #tb_writer.add_image("Confusion Matrix",cm_to_tb,epoch)    
 
-    if val_accuracy > best_accuracy: 
-        torch.save(model, '../model_save/vivit-best-model.pt')
-        torch.save(model.state_dict(), '../model_save/vivit-best-model-parameters.pt')
-
-    print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
-    print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
-
-print("validation cm diagonal: ",np.diag(np.array(confusion_matrix)))
-print("test cm diagonal: ",np.diag(np.array(confusion_matrix_test)))
         
 torch.save(model,"../model_save/vivit-last-model.pt")
 torch.save(model.state_dict(), '../model_save/vivit-last-model-parameters.pt')

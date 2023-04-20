@@ -20,16 +20,16 @@ import torchvision.transforms as trans
 
 class ss_dataset_gen1(Dataset):
 
-    def __init__(self, shuffle = True, data_percentage = 1.0, split = 1):
+    def __init__(self, shuffle = True, data_percentage = 1.0, split = 1, video_list_file = 'trainlist01.txt'):
         #####################      
         
         # self.all_paths = open(os.path.join(cfg.path_folder,'train_vids.txt'),'r').read().splitlines()
         if split == 1:
-            self.all_paths = open(os.path.join(cfg.path_folder, 'ucfTrainTestlist/trainlist01.txt'),'r').read().splitlines()
+            self.all_paths = open(os.path.join(cfg.path_folder, video_list_file),'r').read().splitlines()
         elif split ==2: 
-            self.all_paths = open(os.path.join(cfg.path_folder, 'ucfTrainTestlist/trainlist02.txt'),'r').read().splitlines()
+            self.all_paths = open(os.path.join(cfg.path_folder, video_list_file),'r').read().splitlines()
         elif split ==3: 
-            self.all_paths = open(os.path.join(cfg.path_folder, 'ucfTrainTestlist/trainlist03.txt'),'r').read().splitlines()
+            self.all_paths = open(os.path.join(cfg.path_folder, video_list_file),'r').read().splitlines()
         else:
             print(f'Invalid split input: {split}')
         #####################
@@ -300,10 +300,11 @@ def collate_fn2(batch):
     return sparse_clip, dense_clip0, dense_clip1, dense_clip2, dense_clip3, a_sparse_clip, \
             a_dense_clip0, a_dense_clip1, a_dense_clip2, a_dense_clip3, \
             list_sparse, list_dense, vid_path
-            
+
+"""        
 if __name__ == '__main__':
     train_dataset = ss_dataset_gen1(shuffle = True, data_percentage = 1.0)
-    train_dataloader = DataLoader(train_dataset, batch_size=40, \
+    train_dataloader = DataLoader(train_dataset, batch_size=2, \
         shuffle=False, num_workers=4, collate_fn=collate_fn2)
     print(f'Step involved: {len(train_dataset)/24}')
     t=time.time()
@@ -317,5 +318,5 @@ if __name__ == '__main__':
             print()
 
     print(f'Time taken to load data is {time.time()-t}')
-
+"""
 

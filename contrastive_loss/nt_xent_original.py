@@ -47,7 +47,6 @@ class NTXentLoss(torch.nn.Module):
 
     def forward(self, zis, zjs):
         representations = torch.cat([zjs, zis], dim=0)
-
         similarity_matrix = self.similarity_function(representations, representations)
         # print(f'similarity_matrix shpae is {similarity_matrix.shape}')
 

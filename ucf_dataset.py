@@ -37,7 +37,7 @@ class UCFDataset(torch.utils.data.Dataset):
         frames_per_clip: (int) - number of frames to be read in every video clip [default:16]
     """
 
-    class_names = [x.strip().split()[1] for x in open('UCF101/classInd.txt').readlines()]
+    class_names = [x.strip().split()[1] for x in open('../UCF101/classInd.txt').readlines()]
     def __init__(self, dataset_dir, subset, video_list_file, frames_per_clip=16):
         super().__init__()
         self.dataset_dir = dataset_dir
@@ -47,7 +47,7 @@ class UCFDataset(torch.utils.data.Dataset):
         with open(dataset_dir+'/'+ video_list_file) as video_names_file:
             if self.subset=="train":
                 self.video_list,self.labels = zip(*(files[:-1].split() for files in video_names_file.readlines()))
-                #self.video_list,self.labels = list(self.video_list)[:5],list(self.labels)[:5]
+                self.video_list,self.labels = list(self.video_list)[:10],list(self.labels)[:10]
             else:
                 self.video_list = [files[:-1] for files in video_names_file.readlines()]
                 with open(f'{dataset_dir}/classInd.txt') as self.classIndices:
@@ -67,7 +67,7 @@ class UCFDataset(torch.utils.data.Dataset):
         return len(self.video_list)
 
     def __getitem__(self, idx):
-        videoname = f'/video_data/{self.video_list[idx]}'
+        videoname = f'UCF-101/{self.video_list[idx]}'
         vid = decord.VideoReader(f'{self.dataset_dir}/{videoname}', ctx=decord.cpu(0)) # for reading frames in videos
         nframes = len(vid)
 
@@ -93,7 +93,7 @@ class UCFDataset(torch.utils.data.Dataset):
             label = int(self.labels[idx]) - 1    
         # else, for test subset, read the label index
         else:
-            label=int(self.indices[videoname.split('/')[2]])-1
+            label=int(self.indices[videoname.split('/')[1]])-1
         return imgs,label
 
 def get_ucf101_class_length():
@@ -104,15 +104,15 @@ def get_ucf101_class_length():
     """
     class_len = []
     class_length = {}
-    with open('UCF101/classInd.txt', 'r') as f:
+    with open('../UCF101/classInd.txt', 'r') as f:
         for line in f:
             class_id, class_name = line.strip().split(' ')
             class_length[class_name] = 0
-    with open('UCF101/trainlist01.txt', 'r') as f:
+    with open('../UCF101/trainlist01.txt', 'r') as f:
         for line in f:
             class_name = line.strip().split('/')[0]
             class_length[class_name] += 1
-    with open('UCF101/testlist01.txt', 'r') as f:
+    with open('../UCF101/testlist01.txt', 'r') as f:
         for line in f:
             class_name = line.strip().split('/')[0]
             class_length[class_name] += 1
