@@ -12,7 +12,7 @@ from pytorch_pretrained_vit import ViT
 # position embedding technique(explained in section 3.4)
 
 def pretrained_pos_embedding(frames_per_clip):
-    checkpoint = torch.load('vit.pth',map_location=torch.device('cpu'))
+    checkpoint = torch.load('../pretrain_weights/vit.pth',map_location=torch.device('cpu'))
     pos_embed_weights = OrderedDict()
     for key,value in checkpoint.items():
         if key.startswith('pos_embed'):
@@ -169,7 +169,7 @@ class ViViT_2(nn.Module):
         self.tubelet_emb = TubeletEmbeddings((16,3, 224, 224), (16,16,16), num_channels=3, embed_dim=768)
         
         # here 1 is tubelet size instead of number of frames-per clip,change to frames_per_clip when using patch embedding
-        self.pos_embedding = nn.Parameter(pretrained_pos_embedding(1))  
+        self.pos_embedding = nn.Parameter(pretrained_pos_embedding(frames_per_clip))  
         #self.pos_embedding = nn.Parameter(torch.randn(1, frames_per_clip, num_patches + 1, dim)) # <-
         
         self.space_token = nn.Parameter(torch.randn(1, 1, dim))

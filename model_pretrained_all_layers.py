@@ -79,6 +79,7 @@ class MLP(nn.Module):
     
     # dim - inner dims of embedding , inner_dim - dim of the transformer
     def __init__(self, dim, inner_dim,dropout = 0.):
+
         super().__init__()
         # mlp with GELU activation function
         self.mlp = nn.Sequential(
@@ -87,6 +88,7 @@ class MLP(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(inner_dim, dim),
             nn.Dropout(dropout)
+
         )
 
     def forward(self, x):
@@ -94,13 +96,17 @@ class MLP(nn.Module):
 
 class Attention(nn.Module):
     """
+
         dim: (int) - inner dimension of embeddings[default:768] 
+
         heads: (int) - number of attention heads[default:12] # for pretrained model
         dim_head: (int) - dimension of transformer head [default:64] 
     
     """
 
+
     def __init__(self, dim = 768, heads = 12, dim_head = 64,dropout = 0.):
+
         super().__init__()
         inner_dim = dim_head *  heads 
         #project_out = not (heads == 1 and dim_head == dim)
@@ -112,7 +118,9 @@ class Attention(nn.Module):
         self.make_qkv = nn.Linear(dim, inner_dim *3) 
 
         # Linear projection to required output dimension
+
         self.get_output = nn.Sequential(nn.Linear(inner_dim, dim),nn.Dropout(dropout))
+
         #if project_out else nn.Identity()
         
 
@@ -152,7 +160,9 @@ class Transformer(nn.Module):
     
     """
 
+
     def __init__(self, dim, depth, heads=8, dim_head=64, mlp_dim=3072,dropout = 0.):
+
         super().__init__()
         
         self.model_layers = nn.ModuleList([])
@@ -160,9 +170,11 @@ class Transformer(nn.Module):
             self.model_layers.append(nn.ModuleList([
                 nn.LayerNorm(dim),
                 #nn.MultiheadAttention(dim, heads,batch_first=True),
+
                 Attention(dim, heads, dim_head,dropout=dropout),
                 nn.LayerNorm(dim),
                 MLP(dim, mlp_dim,dropout=dropout)
+
             ]))
 
         self.layer_norm = nn.LayerNorm(dim)
@@ -196,12 +208,15 @@ class ViViT_2(nn.Module):
     
     """
 
+
     def __init__(self, image_size, patch_size, num_classes, frames_per_clip=32, dim = 768, depth = 12, heads = 12, pooling = 'mean', in_channels = 3, dim_head = 64, scale_dim = 4,tube = False, dropout = 0,emb_dropout = 0, str = 1):
+
         
         super().__init__()
 
         num_patches = (image_size // patch_size) ** 2   # => 196 for 224x224 images
         patch_dim = in_channels * patch_size ** 2      # => 3*16*16
+
 
         assert pooling in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
 
@@ -222,20 +237,25 @@ class ViViT_2(nn.Module):
         # position embeddings of shape: (1, frames_per_clip = 16, num_patches + 1 = 197, 192)
         self.pos_embed = nn.Parameter(torch.randn(1, int(frames_per_clip//str), num_patches + 1, dim))
 
+
         # space (i.e. for each image) tokens of shape: (1, 1, 192). The 192 is the tokens obtained in "get_patch_emb" 
         self.spatial_token = nn.Parameter(torch.randn(1, 1, dim))
         
         # spatial transformer ViT
+
         self.spatial_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim,dropout)
+
 
         # time dimention tokens of shape: (1, 1, 192). 
         self.temporal_token = nn.Parameter(torch.randn(1, 1, dim))
         
         # temporal transformer which takes in spacetransformer's output tokens as the input. 
+
         self.temporal_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim,dropout)
 
         # pooling type, could be "mean" or "cls"
         self.dropout =  nn.Dropout(emb_dropout)
+
         self.pooling = pooling
 
         # mlp head for final classification
@@ -243,9 +263,11 @@ class ViViT_2(nn.Module):
             nn.LayerNorm(dim),
             nn.Linear(dim, num_classes),
             #nn.Softmax(dim=1)             #-> difference from 2 pretrained layer code
+
         )
 
     def forward(self, x):
+
 
         if self.tube_flag==True:
             x = x.permute(0,2,1,3,4)
@@ -253,6 +275,7 @@ class ViViT_2(nn.Module):
             x =  rearrange(x, 'b c t h w -> b t (h w) c')
         else:
             x = self.to_patch_embedding(x)
+
 
         # b = batch_size , t = frames , n = number of patch embeddings= 14*14 , e = embedding size
         b, t, n, e = x.shape     # x.shape = (b, t, 196, 192) 
@@ -263,11 +286,13 @@ class ViViT_2(nn.Module):
         # concatenate cls_token to the patch embedding
         x = torch.cat((spatial_cls_tokens, x), dim=2)     # => x shape = ( b, t, 197 ,192)
 
+
         # add position embedding info 
         x += self.pos_embed[:, :, :(n + 1)]
         
         #add embedding dropout
         x = self.dropout(x)
+
 
         # club together the b & t dimension 
         x = rearrange(x, 'b t n d -> (b t) n d')
