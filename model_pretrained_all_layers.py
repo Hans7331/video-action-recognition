@@ -267,7 +267,7 @@ class ViViT_2(nn.Module):
         ##### sparse augmentation
         if clip_type == 's':
             
-            #x_init = self.downsample(x_init.permute(0,2,1,3,4))
+            #x_init = self.downsample(x_init.permute(0,2,1,3,4)) # dummy layer for testing
             x = self.temp_avg(x)
             x = x.flatten(1)
             
@@ -278,7 +278,5 @@ class ViViT_2(nn.Module):
                                     self.relu(self.bn1(self.fc1(x_init[:,:,i,:,:].flatten(1))))))) for i in range(4)]
             
             return x, x1, x2, x3, x4
-
-
 
         return x

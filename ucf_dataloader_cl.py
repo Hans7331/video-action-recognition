@@ -13,10 +13,8 @@ import parameters as params
 import json
 import math
 import cv2
-# from tqdm import tqdm
 import time
 import torchvision.transforms as trans
-# from decord import VideoReader
 
 class ss_dataset_gen1(Dataset):
 

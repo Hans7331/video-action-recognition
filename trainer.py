@@ -26,21 +26,17 @@ import pickle
 import zipfile
 import opt
 from torch.cuda.amp import autocast, GradScaler
-
-#from model_2_pretrained_2_layers import ViViT_2 as model_2_pretrained_2_layers
 from model_2_scratch import ViViT as model_2_scratch
 from model_pretrained_all_layers import ViViT_2 as model_2_pretrained_all_layers
-
 from checkpoint_saver import CheckpointSaver
 from confusion_matrix import plot_confuse_matrix,add_cm_to_tb,plot_confusion_matrix_diagonal,ConfusionMatrix
-
 from contrastive_loss.nt_xent_original import *
 from contrastive_loss.global_local_temporal_contrastive import global_local_temporal_contrastive
 from ucf_dataloader_cl import ss_dataset_gen1, collate_fn2
-
-from cl_model import *
-
+from cl_model import *  # original constrative loss model from TCLR paper (for testing)
 from r3d import r3d_18
+
+
 
 # set device
 seed = 400
@@ -53,11 +49,11 @@ torch.manual_seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
-def build_r3d_backbone(): #Official PyTorch R3D-18 model taken from https://github.com/pytorch/vision/blob/master/torchvision/models/video/resnet.py
-    
-    model = r3d_18(pretrained = False, progress = False)
-    #Expanding temporal dimension of the final layer by replacing temporal stride with temporal dilated convolution, this doesn't cost any additional parameters!
 
+############################################### Original Constrastive loss model
+
+def build_r3d_backbone(): #Official PyTorch R3D-18 model taken from https://github.com/pytorch/vision/blob/master/torchvision/models/video/resnet.py
+    model = r3d_18(pretrained = False, progress = False)
     model.layer4[0].conv1[0] = nn.Conv3d(256, 512, kernel_size=(3, 3, 3),\
                                 stride=(1, 2, 2), padding=(2, 1, 1),dilation = (2,1,1), bias=False)
     model.layer4[0].downsample[0] = nn.Conv3d(256, 512,\
@@ -176,7 +172,7 @@ class Driver:
             losses_ic2.append(loss_ic2.item())
 
             
-            if (i+1) % 25 == 0: 
+            if (i+1) % 2 == 0: 
                 print(f'Training Epoch {epoch}, Batch {i}, Loss: {np.mean(losses) :.5f}')
                 print(f'Training Epoch {epoch}, Batch {i}, losses_local_local: {np.mean(losses_local_local) :.5f}')
                 print(f'Training Epoch {epoch}, Batch {i}, losses_global_local: {np.mean(losses_global_local) :.5f}')
@@ -217,7 +213,6 @@ class Driver:
 
         return accuracy*100
 
-# ##################################################################
 
 ############################# model initialisation
 tb_writer = SummaryWriter()
@@ -277,9 +272,9 @@ if opt.pr == 0:
 elif opt.pr == 2:
     model = model_2_pretrained_all_layers(image_size= opt.image_size, patch_size=patch_size, num_classes=num_classes, frames_per_clip=frames_per_clip)
 
+
 f = build_r3d_backbone()
 model = nn.Sequential(f,model)
-
 model.to(device)
 
 # define the loss and optimizers
@@ -310,11 +305,13 @@ for epoch in range(1,epochs+1):
 
     scheduler.step()
 
-        
-test_accuracy = Driver.test_model(model, test_dataloader)
-print("Test Accuracy", test_accuracy)
+####################### saving the model
 
 torch.save(model,"../model_save/vivit-last-model.pt")
 torch.save(model.state_dict(), '../model_save/vivit-last-model-parameters.pt')
 
-# ############################ Driver functions for driving the loop
+
+####################### testset accuracy calculation
+test_accuracy = Driver.test_model(model, test_dataloader)
+print("Test Accuracy", test_accuracy)
+
