@@ -4,3 +4,5 @@ Contrastive loss implementation with ViViT model. The code is in progress and ma
 
 TCLR - https://github.com/DAVEISHAN/TCLR
 
+* Currently it works with UCF101 dataset, Activitynet requires update in the dataloader.
+
