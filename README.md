@@ -4,7 +4,7 @@
 
 -[Pretrained weights for tubelet size 1](https://drive.google.com/file/d/1L7Afvmmku_sHCjRZurGWSxiZDlXl_cuF/view?usp=sharing)
 
--[Pretrained weights for tubelet size of 2](https://drive.google.com/file/d/1utNvNchWlZGyMWIZekf0erSIU3Rcx0eN/view?usp=sharing)
+-[Pretrained weights for tubelet size of 2](https://drive.google.com/file/d/1q5R2aJ2ncW8hEEl1dYRiRbAhGlTekvPD/view?usp=sharing)
 
 
 This code is an implementation of an activity recognition model that uses PyTorch for training and testing. The model takes in a video clip and predicts the activity being performed in the clip. This implementation uses the ActivityNet and UCF101 dataset, which has 21 activity classes.
